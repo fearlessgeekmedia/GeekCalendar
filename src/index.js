@@ -34,7 +34,7 @@ function getAllEventsForMonth(year, month) {
 	return events;
 }
 
-const App = () => {
+const App = ({ onRequestQuit }) => {
 	const [year, setYear] = useState(now.getFullYear());
 	const [month, setMonth] = useState(now.getMonth());
 	const [inputMode, setInputMode] = useState(null); // null | 'day' | 'text'
@@ -45,6 +45,8 @@ const App = () => {
 	const [confirmDelete, setConfirmDelete] = useState(false);
 	const [editMode, setEditMode] = useState(false);
 	const [editText, setEditText] = useState('');
+	const [confirmQuit, setConfirmQuit] = useState(false); // NEW STATE
+    const [shouldQuit, setShouldQuit] = useState(false); // NEW STATE
 	const { exit } = useApp();
 
 	const eventDays = getEventDaysForMonth(year, month);
@@ -67,6 +69,19 @@ const App = () => {
 	}, [year, month, allEvents.length]);
 
 	useInput((input, key) => {
+		if (confirmQuit) {
+			if (input.toLowerCase() === 'y') {
+				ensureSaveDir();
+				saveEventsToFile(SAVE_FILE);
+                onRequestQuit && onRequestQuit();
+			} else if (input.toLowerCase() === 'n') {
+                onRequestQuit && onRequestQuit();
+			} else if (key.escape) {
+				setConfirmQuit(false);
+				setMessage('Quit cancelled.');
+			}
+			return;
+		}
 		if (confirmDelete) {
 			if (input.toLowerCase() === 'y') {
 				deleteEvent(year, month, selected.day, selected.index);
@@ -220,7 +235,9 @@ const App = () => {
 			}
 		}
 		if (input === 'q') {
-			exit();
+			setConfirmQuit(true);
+			// Do not setMessage here, the prompt is rendered below
+			return;
 		}
 		if (input === 'e' && selected) {
 			const eventsForDay = getEventsForDay(year, month, selected.day);
@@ -232,6 +249,12 @@ const App = () => {
 			return;
 		}
 	});
+
+    React.useEffect(() => {
+        if (shouldQuit) {
+            exit({ exit: false });
+        }
+    }, [shouldQuit, exit]);
 
 	const monthNames = [
 		'January', 'February', 'March', 'April', 'May', 'June',
@@ -270,6 +293,9 @@ const App = () => {
 			React.createElement(Text, null, 'Edit event: '),
 			React.createElement(Text, { inverse: true }, editText || ' ')
 		),
+		confirmQuit && React.createElement(Box, { marginTop: 1 },
+			React.createElement(Text, { color: 'yellow', bold: true }, 'Save before quitting? (y/n, esc to cancel)')
+		),
 		React.createElement(Box, { marginTop: 1 },
 			React.createElement(Text, { dimColor: true }, '←/h: prev month  →/l: next month  SHIFT+J: next year  SHIFT+K: prev year  g: today  a: add event  d: delete event  s: save  S: load  c: import Calcure  u: import Calcurse  q: quit')
 		)
@@ -277,4 +303,17 @@ const App = () => {
 };
 
 console.clear();
-render(React.createElement(App));
+let inkInstance;
+function handleRequestQuit() {
+  if (inkInstance) {
+    inkInstance.unmount();
+    setTimeout(() => {
+      process.stdout.write('\x1b[2J\x1b[0;0H'); // clear screen
+      process.stdout.write('\nYou can financially support the development of this app at https://ko-fi.com/fearlessgeekmedia\n');
+      process.exit();
+    }, 50);
+  }
+}
+inkInstance = render(React.createElement(App, { onRequestQuit: handleRequestQuit }), {
+  exitOnCtrlC: false
+});
