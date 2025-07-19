@@ -262,7 +262,7 @@ const App = ({ onRequestQuit }) => {
 	];
 
 	return React.createElement(Box, { flexDirection: 'column' },
-		React.createElement(Text, { color: 'cyan' }, 'GeekCalendar'),
+		// React.createElement(Text, { color: 'cyan' }, 'GeekCalendar'),
 		React.createElement(Box, { marginTop: 1, marginBottom: 1 },
 			React.createElement(Text, { bold: true }, `${monthNames[month]} ${year}`)
 		),
