@@ -1,6 +1,6 @@
 # GeekCalendar
 
-![GeekCaliendar](geekcalendar.gif)
+![GeekCalendar](geekcalendar.gif)
 
 A TUI (Text User Interface) calendar application built with Node.js and [Ink](https://github.com/vadimdemedes/ink). Supports importing events from Calcure and Calcurse.
 
