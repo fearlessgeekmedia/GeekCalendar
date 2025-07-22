@@ -16,8 +16,8 @@ A TUI (Text User Interface) calendar application built with Node.js and [Ink](ht
 - Node.js (v16+ recommended)
 
 ### Install dependencies
-```sh
-npm install
+```shrr
+npm install ink react
 ```
 
 ### Run the app (local)
