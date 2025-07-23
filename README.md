@@ -16,9 +16,19 @@ A TUI (Text User Interface) calendar application built with Node.js and [Ink](ht
 ### Prerequisites
 - Node.js (v16+ recommended)
 
-### Install dependencies
+### Installation
+
+This project uses Node.js and has the following dependencies:
+
+- @octokit/rest
+- ink
+- js-yaml
+- react
+
+To install these dependencies, run the following command in the project directory:
+
 ```sh
-npm install
+npm install @octokit/rest ink js-yaml react
 ```
 
 ### Run the app (local)
@@ -27,9 +37,9 @@ npm start
 ```
 
 ### Install globally as a CLI
-To use `geekcalendar` from anywhere:
+To use `geekcalendar` from anywhere, run the following command from the project directory:
 ```sh
-npm install -g
+npm install -g .
 ```
 
 Then run:
