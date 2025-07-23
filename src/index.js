@@ -6,6 +6,7 @@ import MonthEventList from './components/MonthEventList.js';
 import { addEvent, getEventDaysForMonth, getEventsForDay, deleteEvent, saveEventsToFile, loadEventsFromFile } from './calendarData.js';
 import { importCalcureEventsFromFile } from './importers/calcure.js';
 import { importCalcurseEventsFromFile } from './importers/calcurse.js';
+import { syncWithGitHub } from './githubSync.js';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
@@ -234,6 +235,13 @@ const App = ({ onRequestQuit }) => {
 				setMessage(`Failed to import from Calcurse (${CALCURSE_FILE}).`);
 			}
 		}
+		if (input === 'y') {
+			syncWithGitHub(SAVE_FILE).then(() => {
+				setMessage('Synced with GitHub!');
+			}).catch(err => {
+				setMessage(`GitHub sync failed: ${err.message}`);
+			});
+		}
 		if (input === 'q') {
 			setConfirmQuit(true);
 			// Do not setMessage here, the prompt is rendered below
@@ -297,7 +305,7 @@ const App = ({ onRequestQuit }) => {
 			React.createElement(Text, { color: 'yellow', bold: true }, 'Save before quitting? (y/n, esc to cancel)')
 		),
 		React.createElement(Box, { marginTop: 1 },
-			React.createElement(Text, { dimColor: true }, '←/h: prev month  →/l: next month  SHIFT+J: next year  SHIFT+K: prev year  g: today  a: add event  d: delete event  s: save  S: load  c: import Calcure  u: import Calcurse  q: quit')
+			React.createElement(Text, { dimColor: true }, '←/h: prev month  →/l: next month  SHIFT+J: next year  SHIFT+K: prev year  g: today  a: add event  d: delete event  s: save  S: load  c: import Calcure  u: import Calcurse  y: sync  q: quit')
 		)
 	);
 };

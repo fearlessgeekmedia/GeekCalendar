@@ -9,6 +9,7 @@ A TUI (Text User Interface) calendar application built with Node.js and [Ink](ht
 - Add, edit, and delete events
 - Import events from Calcure and Calcurse
 - Save/load events (stored in `~/.config/geekcalendar/calendar.json`)
+- Sync events with a GitHub repository
 
 ## Getting Started
 
@@ -16,8 +17,8 @@ A TUI (Text User Interface) calendar application built with Node.js and [Ink](ht
 - Node.js (v16+ recommended)
 
 ### Install dependencies
-```shrr
-npm install ink react
+```sh
+npm install
 ```
 
 ### Run the app (local)
@@ -44,6 +45,24 @@ geekcalendar
 
 ---
 
+## GitHub Sync
+
+To sync your calendar with a GitHub repository, you need to create a `config.yml` file at `~/.config/geekcalendar/config.yml` with the following content:
+
+```yaml
+github:
+  owner: YOUR_GITHUB_USERNAME
+  repo: YOUR_GITHUB_REPOSITORY_NAME
+  path: calendar.json # You can change the filename if you want
+  token: YOUR_PERSONAL_ACCESS_TOKEN
+```
+
+Replace the placeholder values with your GitHub username, the name of the repository you want to sync to, and a GitHub Personal Access Token with `repo` scope.
+
+Once you have configured the `config.yml` file, you can use the `y` key in the application to sync your calendar data.
+
+---
+
 ## Keybindings
 
 - `←/h` and `→/l`: Change month
@@ -57,6 +76,7 @@ geekcalendar
 - `S`: Load events from file
 - `c`: Import from Calcure (`~/.config/calcure/events.csv`)
 - `u`: Import from Calcurse (`~/.local/share/calcurse/apts`)
+- `y`: Sync with GitHub
 - `q`: Quit
 
 ## Importing from Calcure and Calcurse
