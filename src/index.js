@@ -236,7 +236,9 @@ const App = ({ onRequestQuit }) => {
 			}
 		}
 		if (input === 'y') {
+			setMessage('Syncing with GitHub...');
 			syncWithGitHub(SAVE_FILE).then(() => {
+				loadEventsFromFile(SAVE_FILE); // Reload events from disk
 				setMessage('Synced with GitHub!');
 			}).catch(err => {
 				setMessage(`GitHub sync failed: ${err.message}`);
