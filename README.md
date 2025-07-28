@@ -104,6 +104,15 @@ By default, all your calendar events are saved to:
 ~/.config/geekcalendar/calendar.json
 ```
 
+
+## 💖 Support GeekCalendar
+
+If GeekCalendar is useful to you, please consider supporting its development!
+
+- [Buy me a coffee on Ko-fi](https://ko-fi.com/fearlessgeekmedia)
+
+Your support helps keep this project alive and growing. Thank you!
+
 ---
 
 ## License
