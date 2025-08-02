@@ -35,48 +35,100 @@ async function syncWithGitHub(filePath) {
     const { owner, repo, path, token } = getConfig();
     const octokit = new Octokit({ auth: token });
 
-    // Ensure the local file exists before trying to read it
+    // Ensure the local file exists and get its mtime
     if (!fs.existsSync(filePath)) {
         fs.writeFileSync(filePath, '[]', 'utf8');
     }
-
     const localEvents = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    const remoteFile = await getGitHubFile(octokit, owner, repo, path);
+    const localStats = fs.statSync(filePath);
+    const localMtimeMs = localStats.mtimeMs; // Modification time in milliseconds
 
-    if (remoteFile) {
-        const remoteContent = Buffer.from(remoteFile.content, 'base64').toString('utf8');
-        const remoteEvents = JSON.parse(remoteContent);
-        
-        const mergedEvents = [...localEvents];
-        const localEventStrs = new Set(localEvents.map(e => JSON.stringify(e)));
+    // Get remote file content and its last commit date
+    let remoteFile = null;
+    let remoteCommitDateMs = 0; // Initialize to 0 for non-existent or old files
 
-        remoteEvents.forEach(remoteEvent => {
-            if (!localEventStrs.has(JSON.stringify(remoteEvent))) {
-                mergedEvents.push(remoteEvent);
-            }
+    try {
+        const { data } = await octokit.repos.getContent({
+            owner,
+            repo,
+            path,
         });
+        remoteFile = data;
 
-        // Only update if there are changes
-        if (JSON.stringify(mergedEvents) !== remoteContent) {
-            await octokit.repos.createOrUpdateFileContents({
-                owner,
-                repo,
-                path,
-                message: 'Sync calendar data',
-                content: Buffer.from(JSON.stringify(mergedEvents, null, 2)).toString('base64'),
-                sha: remoteFile.sha,
-            });
+        // Fetch commit details for the specific file's path to get its last modified date
+        const { data: commits } = await octokit.repos.listCommits({
+            owner,
+            repo,
+            path,
+            per_page: 1, // Only need the latest
+        });
+        if (commits && commits.length > 0) {
+            remoteCommitDateMs = new Date(commits[0].commit.committer.date).getTime();
         }
-        fs.writeFileSync(filePath, JSON.stringify(mergedEvents, null, 2), 'utf8');
-    } else {
-        // File doesn't exist on GitHub, so create it
+    } catch (error) {
+        if (error.status === 404) {
+            remoteFile = null; // File doesn't exist on GitHub
+        } else {
+            throw error;
+        }
+    }
+
+    // Decide sync direction based on timestamps
+    let finalEvents = [];
+    if (!remoteFile) {
+        // Remote file doesn't exist, create it from local
+        finalEvents = localEvents;
         await octokit.repos.createOrUpdateFileContents({
             owner,
             repo,
             path,
             message: 'Initial calendar data',
-            content: Buffer.from(JSON.stringify(localEvents, null, 2)).toString('base64'),
+            content: Buffer.from(JSON.stringify(finalEvents, null, 2)).toString('base64'),
         });
+        fs.writeFileSync(filePath, JSON.stringify(finalEvents, null, 2), 'utf8'); // Ensure local is formatted
+    } else {
+        const remoteContent = Buffer.from(remoteFile.content, 'base64').toString('utf8');
+        const remoteEvents = JSON.parse(remoteContent);
+
+        // Compare timestamps
+        if (localMtimeMs > remoteCommitDateMs) {
+            // Local is newer, push local to GitHub
+            finalEvents = localEvents;
+            if (JSON.stringify(finalEvents) !== remoteContent) { // Only push if content actually changed
+                await octokit.repos.createOrUpdateFileContents({
+                    owner,
+                    repo,
+                    path,
+                    message: 'Sync calendar data: Local is newer',
+                    content: Buffer.from(JSON.stringify(finalEvents, null, 2)).toString('base64'),
+                    sha: remoteFile.sha,
+                });
+            }
+            fs.writeFileSync(filePath, JSON.stringify(finalEvents, null, 2), 'utf8'); // Ensure local is formatted
+        } else if (remoteCommitDateMs > localMtimeMs) {
+            // Remote is newer, pull from GitHub to local
+            finalEvents = remoteEvents;
+            fs.writeFileSync(filePath, JSON.stringify(finalEvents, null, 2), 'utf8');
+        } else {
+            // Timestamps are equal or no meaningful difference, check content for potential manual changes or re-formatting
+            if (JSON.stringify(localEvents) !== remoteContent) {
+                // Contents are different but timestamps are same (e.g., re-formatted locally or remotely)
+                // Prioritize local in this ambiguous case
+                finalEvents = localEvents;
+                await octokit.repos.createOrUpdateFileContents({
+                    owner,
+                    repo,
+                    path,
+                    message: 'Sync calendar data: Content differs, local prioritized',
+                    content: Buffer.from(JSON.stringify(finalEvents, null, 2)).toString('base64'),
+                    sha: remoteFile.sha,
+                });
+                fs.writeFileSync(filePath, JSON.stringify(finalEvents, null, 2), 'utf8');
+            } else {
+                // Local and remote are in sync. No action needed.
+                finalEvents = localEvents;
+            }
+        }
     }
 }
 
