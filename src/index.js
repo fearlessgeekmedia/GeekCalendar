@@ -6,7 +6,7 @@ import MonthEventList from './components/MonthEventList.js';
 import { addEvent, getEventDaysForMonth, getEventsForDay, deleteEvent, saveEventsToFile, loadEventsFromFile } from './calendarData.js';
 import { importCalcureEventsFromFile } from './importers/calcure.js';
 import { importCalcurseEventsFromFile } from './importers/calcurse.js';
-import { syncWithGitHub } from './githubSync.js';
+import { syncWithGitHub, listRemoteCommits, getFileContentAtRef, listLocalBackups } from './githubSync.js';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
@@ -48,6 +48,9 @@ const App = ({ onRequestQuit }) => {
 	const [editText, setEditText] = useState('');
 	const [confirmQuit, setConfirmQuit] = useState(false); // NEW STATE
     const [shouldQuit, setShouldQuit] = useState(false); // NEW STATE
+    const [restoreMode, setRestoreMode] = useState(null); // null | 'chooseSource' | 'chooseLocal' | 'chooseRemote'
+    const [localBackups, setLocalBackups] = useState([]);
+    const [remoteCommits, setRemoteCommits] = useState([]);
 	const { exit } = useApp();
 
 	const eventDays = getEventDaysForMonth(year, month);
@@ -95,6 +98,80 @@ const App = ({ onRequestQuit }) => {
 			}
 			return;
 		}
+        if (restoreMode === 'chooseSource') {
+            if (input.toLowerCase() === 'l') {
+                try {
+                    const backups = listLocalBackups();
+                    setLocalBackups(backups);
+                    setRestoreMode('chooseLocal');
+                    setMessage('Choose a local backup to restore (1-9), esc to cancel.');
+                } catch (e) {
+                    setMessage('Failed to list local backups.');
+                    setRestoreMode(null);
+                }
+            } else if (input.toLowerCase() === 'g') {
+                setMessage('Fetching GitHub history...');
+                listRemoteCommits(5).then(commits => {
+                    setRemoteCommits(commits);
+                    setRestoreMode('chooseRemote');
+                    setMessage('Choose a GitHub revision to restore (1-5), esc to cancel.');
+                }).catch(err => {
+                    setMessage(`Failed to fetch GitHub history: ${err.message}`);
+                    setRestoreMode(null);
+                });
+            } else if (key.escape) {
+                setRestoreMode(null);
+                setMessage('Restore cancelled.');
+            }
+            return;
+        }
+        if (restoreMode === 'chooseLocal') {
+            if (/^[1-9]$/.test(input)) {
+                const idx = parseInt(input, 10) - 1;
+                if (localBackups[idx]) {
+                    try {
+                        ensureSaveDir();
+                        fs.copyFileSync(localBackups[idx].fullPath, SAVE_FILE);
+                        loadEventsFromFile(SAVE_FILE);
+                        setMessage(`Restored from backup: ${localBackups[idx].fileName}`);
+                    } catch (e) {
+                        setMessage('Failed to restore from backup.');
+                    }
+                    setRestoreMode(null);
+                }
+            } else if (key.escape) {
+                setRestoreMode(null);
+                setMessage('Restore cancelled.');
+            }
+            return;
+        }
+        if (restoreMode === 'chooseRemote') {
+            if (/^[1-5]$/.test(input)) {
+                const idx = parseInt(input, 10) - 1;
+                if (remoteCommits[idx]) {
+                    setMessage('Restoring from GitHub...');
+                    getFileContentAtRef(remoteCommits[idx].sha).then(content => {
+                        try {
+                            const parsed = JSON.parse(content);
+                            ensureSaveDir();
+                            fs.writeFileSync(SAVE_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+                            loadEventsFromFile(SAVE_FILE);
+                            setMessage(`Restored from GitHub commit ${remoteCommits[idx].sha.substring(0,7)}.`);
+                        } catch (e) {
+                            setMessage('Remote file at selected commit is not valid JSON.');
+                        }
+                    }).catch(err => {
+                        setMessage(`Failed to restore from GitHub: ${err.message}`);
+                    }).finally(() => {
+                        setRestoreMode(null);
+                    });
+                }
+            } else if (key.escape) {
+                setRestoreMode(null);
+                setMessage('Restore cancelled.');
+            }
+            return;
+        }
 		if (editMode) {
 			if (key.return) {
 				// Update event text
@@ -215,6 +292,11 @@ const App = ({ onRequestQuit }) => {
 			setMessage('Events loaded from file.');
 			setSelected(null);
 		}
+        if (input === 'r') {
+            setRestoreMode('chooseSource');
+            setMessage('Restore: l = local backups, g = GitHub history (esc to cancel)');
+            return;
+        }
 		if (input === 'c') {
 			try {
 				const imported = importCalcureEventsFromFile(CALCURE_FILE);
@@ -235,15 +317,18 @@ const App = ({ onRequestQuit }) => {
 				setMessage(`Failed to import from Calcurse (${CALCURSE_FILE}).`);
 			}
 		}
-		if (input === 'y') {
-			setMessage('Syncing with GitHub...');
-			syncWithGitHub(SAVE_FILE).then(() => {
-				loadEventsFromFile(SAVE_FILE); // Reload events from disk
-				setMessage('Synced with GitHub!');
-			}).catch(err => {
-				setMessage(`GitHub sync failed: ${err.message}`);
-			});
-		}
+        if (input === 'y') {
+            // Autosave current in-memory events to avoid losing unsaved changes
+            ensureSaveDir();
+            saveEventsToFile(SAVE_FILE);
+            setMessage('Syncing with GitHub...');
+            syncWithGitHub(SAVE_FILE).then(() => {
+                loadEventsFromFile(SAVE_FILE); // Reload events from disk
+                setMessage('Synced with GitHub!');
+            }).catch(err => {
+                setMessage(`GitHub sync failed: ${err.message}`);
+            });
+        }
 		if (input === 'q') {
 			setConfirmQuit(true);
 			// Do not setMessage here, the prompt is rendered below
@@ -307,8 +392,24 @@ const App = ({ onRequestQuit }) => {
 			React.createElement(Text, { color: 'yellow', bold: true }, 'Save before quitting? (y/n, esc to cancel)')
 		),
 		React.createElement(Box, { marginTop: 1 },
-			React.createElement(Text, { dimColor: true }, '←/h: prev month  →/l: next month  SHIFT+J: next year  SHIFT+K: prev year  g: today  a: add event  d: delete event  s: save  S: load  c: import Calcure  u: import Calcurse  y: sync  q: quit')
-		)
+			React.createElement(Text, { dimColor: true }, '←/h: prev  →/l: next  SHIFT+J: next yr  SHIFT+K: prev yr  g: today  a: add  e: edit  d: delete  s: save  S: load  c: Calcure  u: Calcurse  y: sync  r: restore  q: quit')
+		),
+        restoreMode === 'chooseSource' && React.createElement(Box, { marginTop: 1 },
+            React.createElement(Text, { color: 'yellow' }, 'Restore: l = local backups, g = GitHub history (esc to cancel)')
+        ),
+        restoreMode === 'chooseLocal' && React.createElement(Box, { marginTop: 1, flexDirection: 'column' },
+            React.createElement(Text, { bold: true }, 'Local backups (choose 1-9):'),
+            ...localBackups.slice(0, 9).map((b, i) => React.createElement(Text, { key: b.fileName }, `${i+1}. ${b.fileName}`))
+        ),
+        restoreMode === 'chooseRemote' && React.createElement(Box, { marginTop: 1, flexDirection: 'column' },
+            React.createElement(Text, { bold: true }, 'GitHub history (choose 1-5):'),
+            ...remoteCommits.slice(0, 5).map((c, i) => {
+                const shortSha = c.sha ? c.sha.substring(0,7) : 'unknown';
+                const date = c.date ? new Date(c.date).toISOString().slice(0,10) : '';
+                const msg = (c.message || '').split('\n')[0];
+                return React.createElement(Text, { key: c.sha || String(i) }, `${i+1}. ${shortSha} ${date} ${msg}`);
+            })
+        )
 	);
 };
 
