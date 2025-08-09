@@ -51,6 +51,10 @@ const App = ({ onRequestQuit }) => {
     const [restoreMode, setRestoreMode] = useState(null); // null | 'chooseSource' | 'chooseLocal' | 'chooseRemote'
     const [localBackups, setLocalBackups] = useState([]);
     const [remoteCommits, setRemoteCommits] = useState([]);
+    const [recurrenceStage, setRecurrenceStage] = useState(null); // null | 'ask' | 'type' | 'count'
+    const [recurrenceType, setRecurrenceType] = useState(null); // 'weekly' | 'monthly' | 'yearly'
+    const [recurrenceInput, setRecurrenceInput] = useState(''); // count input
+    const [pendingEvent, setPendingEvent] = useState(null); // { year, month, day, text }
 	const { exit } = useApp();
 
 	const eventDays = getEventDaysForMonth(year, month);
@@ -86,6 +90,102 @@ const App = ({ onRequestQuit }) => {
 			}
 			return;
 		}
+
+        // Recurrence flow handling
+        if (recurrenceStage) {
+            if (recurrenceStage === 'ask') {
+                if (input.toLowerCase() === 'y') {
+                    setRecurrenceStage('type');
+                    setMessage('Recurring type? (w) weekly  (m) monthly  (y) yearly  (esc to cancel)');
+                } else if (input.toLowerCase() === 'n' || key.escape) {
+                    setRecurrenceStage(null);
+                    setPendingEvent(null);
+                    setMessage('Event added.');
+                }
+                return;
+            }
+            if (recurrenceStage === 'type') {
+                if (input.toLowerCase() === 'w') {
+                    setRecurrenceType('weekly');
+                    setRecurrenceStage('count');
+                    setRecurrenceInput('');
+                    setMessage('How many additional weekly occurrences? (enter a number, esc to cancel)');
+                } else if (input.toLowerCase() === 'm') {
+                    setRecurrenceType('monthly');
+                    setRecurrenceStage('count');
+                    setRecurrenceInput('');
+                    setMessage('How many additional monthly occurrences? (enter a number, esc to cancel)');
+                } else if (input.toLowerCase() === 'y') {
+                    setRecurrenceType('yearly');
+                    setRecurrenceStage('count');
+                    setRecurrenceInput('');
+                    setMessage('How many additional yearly occurrences? (enter a number, esc to cancel)');
+                } else if (key.escape) {
+                    setRecurrenceStage(null);
+                    setPendingEvent(null);
+                    setMessage('Recurring cancelled.');
+                }
+                return;
+            }
+            if (recurrenceStage === 'count') {
+                if (key.return) {
+                    const count = parseInt(recurrenceInput, 10);
+                    if (!isNaN(count) && count > 0 && pendingEvent) {
+                        // Helpers for date math
+                        const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
+                        const addWeeks = (y, m, d, weeks) => {
+                            const base = new Date(y, m, d);
+                            base.setDate(base.getDate() + weeks * 7);
+                            return { year: base.getFullYear(), month: base.getMonth(), day: base.getDate() };
+                        };
+                        const addMonthsClamped = (y, m, d, months) => {
+                            const targetMonth = m + months;
+                            const targetYear = y + Math.floor(targetMonth / 12);
+                            const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+                            const dim = daysInMonth(targetYear, normalizedMonth);
+                            const targetDay = Math.min(d, dim);
+                            return { year: targetYear, month: normalizedMonth, day: targetDay };
+                        };
+                        const addYearsClamped = (y, m, d, years) => {
+                            const targetYear = y + years;
+                            const dim = daysInMonth(targetYear, m);
+                            const targetDay = Math.min(d, dim);
+                            return { year: targetYear, month: m, day: targetDay };
+                        };
+
+                        let added = 0;
+                        for (let i = 1; i <= count; i++) {
+                            let nextDate;
+                            if (recurrenceType === 'weekly') nextDate = addWeeks(pendingEvent.year, pendingEvent.month, pendingEvent.day, i);
+                            else if (recurrenceType === 'monthly') nextDate = addMonthsClamped(pendingEvent.year, pendingEvent.month, pendingEvent.day, i);
+                            else if (recurrenceType === 'yearly') nextDate = addYearsClamped(pendingEvent.year, pendingEvent.month, pendingEvent.day, i);
+                            if (nextDate) {
+                                addEvent(nextDate.year, nextDate.month, nextDate.day, pendingEvent.text);
+                                added++;
+                            }
+                        }
+                        setMessage(`Event added with ${added} additional ${recurrenceType} occurrences.`);
+                    } else {
+                        setMessage('Invalid number for occurrences.');
+                    }
+                    setRecurrenceStage(null);
+                    setRecurrenceType(null);
+                    setRecurrenceInput('');
+                    setPendingEvent(null);
+                } else if (key.backspace || key.delete) {
+                    setRecurrenceInput(recurrenceInput.slice(0, -1));
+                } else if (/^[0-9]$/.test(input)) {
+                    setRecurrenceInput(recurrenceInput + input);
+                } else if (key.escape) {
+                    setRecurrenceStage(null);
+                    setRecurrenceType(null);
+                    setRecurrenceInput('');
+                    setPendingEvent(null);
+                    setMessage('Recurring cancelled.');
+                }
+                return;
+            }
+        }
 		if (confirmDelete) {
 			if (input.toLowerCase() === 'y') {
 				deleteEvent(year, month, selected.day, selected.index);
@@ -213,10 +313,12 @@ const App = ({ onRequestQuit }) => {
 			if (key.return) {
 				const dayNum = parseInt(inputDay, 10);
 				addEvent(year, month, dayNum, inputText);
+				setPendingEvent({ year, month, day: dayNum, text: inputText });
 				setInputMode(null);
 				setInputDay('');
 				setInputText('');
-				setMessage('Event added!');
+				setRecurrenceStage('ask');
+				setMessage('Make this event recurring? (y/n)');
 			} else if (key.backspace || key.delete) {
 				setInputText(inputText.slice(0, -1));
 			} else {
