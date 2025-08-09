@@ -5,6 +5,7 @@ import os from 'os';
 import path from 'path';
 
 const SAVE_DIR = path.join(os.homedir(), '.config', 'geekcalendar');
+const BACKUP_DIR = path.join(SAVE_DIR, 'backups');
 
 function getConfig() {
     const configPath = path.join(SAVE_DIR, 'config.yml');
@@ -15,12 +16,18 @@ function getConfig() {
     return config.github;
 }
 
-async function getGitHubFile(octokit, owner, repo, path) {
+function ensureBackupDir() {
+    if (!fs.existsSync(BACKUP_DIR)) {
+        fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    }
+}
+
+async function getGitHubFile(octokit, owner, repo, filePathInRepo) {
     try {
         const { data } = await octokit.repos.getContent({
             owner,
             repo,
-            path,
+            path: filePathInRepo,
         });
         return data;
     } catch (error) {
@@ -32,7 +39,13 @@ async function getGitHubFile(octokit, owner, repo, path) {
 }
 
 async function syncWithGitHub(filePath) {
-    const { owner, repo, path, token } = getConfig();
+    ensureBackupDir();
+    const timestamp = new Date().toISOString().replace(/[:.-]/g, '');
+    const backupFilePath = path.join(BACKUP_DIR, `calendar_backup_${timestamp}.json`);
+    fs.copyFileSync(filePath, backupFilePath);
+    console.log(`Backup created at: ${backupFilePath}`);
+
+    const { owner, repo, path: filePathInRepo, token } = getConfig();
     const octokit = new Octokit({ auth: token });
 
     // Ensure the local file exists and get its mtime
@@ -51,7 +64,7 @@ async function syncWithGitHub(filePath) {
         const { data } = await octokit.repos.getContent({
             owner,
             repo,
-            path,
+            path: filePathInRepo,
         });
         remoteFile = data;
 
@@ -59,7 +72,7 @@ async function syncWithGitHub(filePath) {
         const { data: commits } = await octokit.repos.listCommits({
             owner,
             repo,
-            path,
+            path: filePathInRepo,
             per_page: 1, // Only need the latest
         });
         if (commits && commits.length > 0) {
@@ -81,7 +94,7 @@ async function syncWithGitHub(filePath) {
         await octokit.repos.createOrUpdateFileContents({
             owner,
             repo,
-            path,
+            path: filePathInRepo,
             message: 'Initial calendar data',
             content: Buffer.from(JSON.stringify(finalEvents, null, 2)).toString('base64'),
         });
@@ -98,7 +111,7 @@ async function syncWithGitHub(filePath) {
                 await octokit.repos.createOrUpdateFileContents({
                     owner,
                     repo,
-                    path,
+                    path: filePathInRepo,
                     message: 'Sync calendar data: Local is newer',
                     content: Buffer.from(JSON.stringify(finalEvents, null, 2)).toString('base64'),
                     sha: remoteFile.sha,
@@ -118,7 +131,7 @@ async function syncWithGitHub(filePath) {
                 await octokit.repos.createOrUpdateFileContents({
                     owner,
                     repo,
-                    path,
+                    path: filePathInRepo,
                     message: 'Sync calendar data: Content differs, local prioritized',
                     content: Buffer.from(JSON.stringify(finalEvents, null, 2)).toString('base64'),
                     sha: remoteFile.sha,
