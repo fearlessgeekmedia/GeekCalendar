@@ -220,6 +220,21 @@ async function syncWithGitHub(filePath) {
         saveSyncMeta(meta);
     }
 
+    // Strong safety: if one side is empty and the other isn't, prefer the non-empty side
+    if (localEvents.length === 0 && remoteEvents.length > 0) {
+        // Local is empty, remote has data -> pull from remote to avoid data loss
+        writeLocal(remoteEvents);
+        recordCommitSha(remoteLatestCommitSha);
+        return;
+    }
+    if (remoteEvents.length === 0 && localEvents.length > 0) {
+        // Remote is empty/missing, local has data -> push local
+        const newSha = await updateRemoteWithRetry(localEvents, 'Sync calendar data: Remote empty, uploading local', remoteSha);
+        recordCommitSha(newSha);
+        writeLocal(localEvents);
+        return;
+    }
+
     // If remote doesn't exist, initialize it from local
     if (!remoteFile) {
         const newSha = await updateRemoteWithRetry(localEvents, 'Initial calendar data', null);
