@@ -49,6 +49,68 @@ Then run:
 geekcalendar
 ```
 
+## Nix and NixOS
+
+### Nix (flakes)
+- Run without installing:
+```sh
+nix run github:fearlessgeekmedia/geekcalendar
+```
+
+- Install to your user profile:
+```sh
+nix profile install github:fearlessgeekmedia/geekcalendar
+```
+
+- From a local clone (this repo):
+```sh
+cd geekcalendar
+nix develop      # optional dev shell (Node.js 20)
+nix run .#geekcalendar
+# or install
+nix profile install .#geekcalendar
+```
+
+### NixOS (system-wide)
+Add the package to your NixOS flake and rebuild:
+
+```nix
+# flake.nix (top-level)
+inputs.geekcalendar.url = "github:fearlessgeekmedia/geekcalendar";
+
+# flake.nix (in your host's configuration)
+outputs = { self, nixpkgs, ... }@inputs: {
+  nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+    # ...
+    modules = [
+      ({ pkgs, ... }: {
+        environment.systemPackages = [
+          inputs.geekcalendar.packages.${pkgs.system}.geekcalendar
+        ];
+      })
+    ];
+  };
+};
+```
+
+Then:
+
+```sh
+sudo nixos-rebuild switch --flake /etc/nixos#$(hostname -s)
+```
+
+### Home Manager
+Add to your Home Manager configuration:
+
+```nix
+{ pkgs, inputs, ... }:
+{
+  home.packages = [
+    inputs.geekcalendar.packages.${pkgs.system}.geekcalendar
+  ];
+}
+```
+
 ## Project Structure
 - `src/components/` – Ink React components
 - `src/importers/` – Parsers for Calcure and Calcurse
