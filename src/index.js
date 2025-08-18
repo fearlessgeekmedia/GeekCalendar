@@ -302,6 +302,10 @@ const App = ({ onRequestQuit }) => {
 					setMessage('Invalid day. Try again.');
 					setInputDay('');
 				}
+			} else if (key.escape) {
+				setInputMode(null);
+				setInputDay('');
+				setMessage('Add event cancelled.');
 			} else if (key.backspace || key.delete) {
 				setInputDay(inputDay.slice(0, -1));
 			} else if (/^[0-9]$/.test(input)) {
@@ -319,6 +323,10 @@ const App = ({ onRequestQuit }) => {
 				setInputText('');
 				setRecurrenceStage('ask');
 				setMessage('Make this event recurring? (y/n)');
+			} else if (key.escape) {
+				setInputMode(null);
+				setInputText('');
+				setMessage('Add event cancelled.');
 			} else if (key.backspace || key.delete) {
 				setInputText(inputText.slice(0, -1));
 			} else {
