@@ -18,7 +18,7 @@
           pname = "geekcalendar";
           version = (builtins.fromJSON (builtins.readFile ./package.json)).version or "0.0.0";
           src = ./.;
-          npmDepsHash = "sha256-d/aUQ4BObr6xgTtoOHcxl5/XSNVFv/Gv2acrWAbKvEE=";
+          npmDepsHash = "sha256-Pru0JVGIFeG550gFYBxeXMpdXs/JaBg5yd6/SqrI/6c=";
           nodejs = node;
           dontNpmBuild = true; # no build step, CLI app
           meta = with pkgs.lib; {
