@@ -30,46 +30,90 @@ function getMonthMatrix(year, month) {
 
 const dayNames = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-const Calendar = ({ year, month, eventDays }) => {
+const Calendar = ({ year, month, eventDays, theme }) => {
 	const matrix = getMonthMatrix(year, month);
 	const today = new Date();
 	const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
 	const todayDate = today.getDate();
-	return React.createElement(Box, { flexDirection: 'column', borderStyle: 'round', borderColor: 'cyan', padding: 1 },
-		// Day names header
+	
+	// Color scheme for different types of days
+	const getDayColor = (day, dayIndex) => {
+		if (!day) return theme.calendar.days.empty;
+		
+		// Weekend colors
+		if (dayIndex === 0 || dayIndex === 6) return theme.calendar.days.weekend;
+		
+		// Today
+		if (isCurrentMonth && day === todayDate) return theme.calendar.days.today;
+		
+		// Event days
+		if (eventDays && eventDays.has(day)) return theme.calendar.days.event;
+		
+		// Regular weekdays
+		return theme.calendar.days.weekday;
+	};
+	
+	const getDayBackground = (day, dayIndex) => {
+		if (!day) return undefined;
+		
+		// Today gets special background
+		if (isCurrentMonth && day === todayDate) return theme.calendar.backgrounds.today;
+		
+		// Event days get subtle background
+		if (eventDays && eventDays.has(day)) return theme.calendar.backgrounds.event;
+		
+		return undefined;
+	};
+	
+	return React.createElement(Box, { 
+		flexDirection: 'column', 
+		borderStyle: 'round', 
+		borderColor: theme.calendar.border, 
+		padding: 1
+	},
+		// Day names header with gradient colors
 		React.createElement(Box, { flexDirection: 'row' },
-			...dayNames.map((name, i) =>
-				React.createElement(Box, {
+			...dayNames.map((name, i) => {
+				const isWeekend = i === 0 || i === 6;
+				const headerColor = isWeekend ? theme.calendar.header.weekend : theme.calendar.header.weekday;
+				return React.createElement(Box, {
 					key: 'header-' + i,
 					width: 5,
 					alignItems: 'center',
 					justifyContent: 'center',
-					borderStyle: 'single',
-					borderColor: 'gray'
+					borderStyle: isWeekend ? 'double' : 'single',
+					borderColor: headerColor
 				},
-					React.createElement(Text, { bold: true }, name)
-				)
-			)
+					React.createElement(Text, { 
+						bold: true, 
+						color: headerColor,
+						italic: isWeekend
+					}, name)
+				);
+			})
 		),
 		// Weeks
 		...matrix.map((week, wi) =>
 			React.createElement(Box, { flexDirection: 'row', key: 'week-' + wi },
 				...week.map((day, di) => {
-					let color = day ? undefined : 'gray';
-					if (isCurrentMonth && day === todayDate) {
-						color = 'green';
-					} else if (eventDays && day && eventDays.has(day)) {
-						color = 'blue';
-					}
+					const dayColor = getDayColor(day, di);
+					const dayBackground = getDayBackground(day, di);
+					const isWeekend = di === 0 || di === 6;
+					
 					return React.createElement(Box, {
 						key: 'day-' + wi + '-' + di,
 						width: 5,
 						alignItems: 'center',
 						justifyContent: 'center',
-						borderStyle: 'single',
-						borderColor: 'white'
+						borderStyle: isWeekend ? 'double' : 'single',
+						borderColor: dayColor,
+						backgroundColor: dayBackground
 					},
-						React.createElement(Text, { color }, day ? String(day).padStart(2, ' ') : '  ')
+						React.createElement(Text, { 
+							color: dayBackground ? 'black' : dayColor,
+							bold: day === todayDate || (eventDays && day && eventDays.has(day)),
+							italic: isWeekend
+						}, day ? String(day).padStart(2, ' ') : '  ')
 					);
 				})
 			)

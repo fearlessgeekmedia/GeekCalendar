@@ -7,6 +7,7 @@ import { addEvent, getEventDaysForMonth, getEventsForDay, deleteEvent, saveEvent
 import { importCalcureEventsFromFile } from './importers/calcure.js';
 import { importCalcurseEventsFromFile } from './importers/calcurse.js';
 import { syncWithGitHub, listRemoteCommits, getFileContentAtRef, listLocalBackups } from './githubSync.js';
+import { themes, defaultTheme } from './themes.js';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
@@ -14,6 +15,7 @@ import fs from 'fs';
 const now = new Date();
 const SAVE_DIR = path.join(os.homedir(), '.config', 'geekcalendar');
 const SAVE_FILE = path.join(SAVE_DIR, 'calendar.json');
+const THEME_FILE = path.join(SAVE_DIR, 'theme.json');
 const CALCURE_FILE = path.join(os.homedir(), '.config', 'calcure', 'events.csv');
 const CALCURSE_FILE = path.join(os.homedir(), '.local', 'share', 'calcurse', 'apts');
 
@@ -21,6 +23,28 @@ function ensureSaveDir() {
 	if (!fs.existsSync(SAVE_DIR)) {
 		fs.mkdirSync(SAVE_DIR, { recursive: true });
 	}
+}
+
+function saveThemeToFile(themeName) {
+	try {
+		ensureSaveDir();
+		fs.writeFileSync(THEME_FILE, JSON.stringify({ theme: themeName }, null, 2), 'utf8');
+	} catch (e) {
+		console.error('Failed to save theme:', e);
+	}
+}
+
+function loadThemeFromFile() {
+	try {
+		if (fs.existsSync(THEME_FILE)) {
+			const content = fs.readFileSync(THEME_FILE, 'utf8');
+			const config = JSON.parse(content);
+			return config.theme && themes[config.theme] ? config.theme : defaultTheme;
+		}
+	} catch (e) {
+		console.error('Failed to load theme:', e);
+	}
+	return defaultTheme;
 }
 
 function getAllEventsForMonth(year, month) {
@@ -55,6 +79,7 @@ const App = ({ onRequestQuit }) => {
     const [recurrenceType, setRecurrenceType] = useState(null); // 'weekly' | 'monthly' | 'yearly'
     const [recurrenceInput, setRecurrenceInput] = useState(''); // count input
     const [pendingEvent, setPendingEvent] = useState(null); // { year, month, day, text }
+    const [currentTheme, setCurrentTheme] = useState(loadThemeFromFile());
 	const { exit } = useApp();
 
 	const eventDays = getEventDaysForMonth(year, month);
@@ -453,6 +478,16 @@ const App = ({ onRequestQuit }) => {
 			}
 			return;
 		}
+		if (input === 't') {
+			const themeNames = Object.keys(themes);
+			const currentIndex = themeNames.indexOf(currentTheme);
+			const nextIndex = (currentIndex + 1) % themeNames.length;
+			const nextTheme = themeNames[nextIndex];
+			setCurrentTheme(nextTheme);
+			saveThemeToFile(nextTheme);
+			setMessage(`Theme changed to: ${themes[nextTheme].name}`);
+			return;
+		}
 	});
 
     React.useEffect(() => {
@@ -467,17 +502,27 @@ const App = ({ onRequestQuit }) => {
 	];
 
 	return React.createElement(Box, { flexDirection: 'column' },
-		// React.createElement(Text, { color: 'cyan' }, 'GeekCalendar'),
-		React.createElement(Box, { marginTop: 1, marginBottom: 1 },
-			React.createElement(Text, { bold: true }, `${monthNames[month]} ${year}`)
+		// Colorful header with theme colors
+		React.createElement(Box, { marginTop: 1, marginBottom: 1, alignItems: 'center' },
+			...themes[currentTheme].header.map((color, i) => 
+				React.createElement(Text, { 
+					key: i,
+					color: color, 
+					bold: true 
+				}, 'GeekCalendar'[i])
+			)
+		),
+		React.createElement(Box, { marginTop: 1, marginBottom: 1, alignItems: 'center' },
+			React.createElement(Text, { color: themes[currentTheme].monthYear, bold: true, italic: true }, `${monthNames[month]} ${year}`)
 		),
 		React.createElement(Box, { flexDirection: 'row' },
-			React.createElement(Calendar, { year, month, eventDays }),
+			React.createElement(Calendar, { year, month, eventDays, theme: themes[currentTheme] }),
 			React.createElement(MonthEventList, {
 				year,
 				month,
 				selectedDay: selected ? selected.day : null,
-				selectedEventIndex: selected ? selected.index : null
+				selectedEventIndex: selected ? selected.index : null,
+				theme: themes[currentTheme]
 			})
 		),
 		inputMode === 'day' && React.createElement(Box, { marginTop: 1 },
@@ -489,20 +534,20 @@ const App = ({ onRequestQuit }) => {
 			React.createElement(Text, { inverse: true }, inputText || ' ')
 		),
 		message && React.createElement(Box, { marginTop: 1 },
-			React.createElement(Text, { color: 'green' }, message)
+			React.createElement(Text, { color: themes[currentTheme].messages.success }, message)
 		),
 		confirmDelete && React.createElement(Box, { marginTop: 1 },
-			React.createElement(Text, { color: 'red', bold: true }, 'Delete this event? (y/n)')
+			React.createElement(Text, { color: themes[currentTheme].messages.error, bold: true }, 'Delete this event? (y/n)')
 		),
 		editMode && React.createElement(Box, { marginTop: 1 },
 			React.createElement(Text, null, 'Edit event: '),
 			React.createElement(Text, { inverse: true }, editText || ' ')
 		),
 		confirmQuit && React.createElement(Box, { marginTop: 1 },
-			React.createElement(Text, { color: 'yellow', bold: true }, 'Save before quitting? (y/n, esc to cancel)')
+			React.createElement(Text, { color: themes[currentTheme].messages.warning, bold: true }, 'Save before quitting? (y/n, esc to cancel)')
 		),
 		React.createElement(Box, { marginTop: 1 },
-			React.createElement(Text, { dimColor: true }, '←/h: prev  →/l: next  SHIFT+J: next yr  SHIFT+K: prev yr  g: today  a: add  e: edit  d: delete  s: save  S: load  c: Calcure  u: Calcurse  y: sync  r: restore  q: quit')
+			React.createElement(Text, { dimColor: true }, '←/h: prev  →/l: next  SHIFT+J: next yr  SHIFT+K: prev yr  g: today  a: add  e: edit  d: delete  s: save  S: load  c: Calcure  u: Calcurse  y: sync  r: restore  t: theme  q: quit')
 		),
         restoreMode === 'chooseSource' && React.createElement(Box, { marginTop: 1 },
             React.createElement(Text, { color: 'yellow' }, 'Restore: l = local backups, g = GitHub history (esc to cancel)')

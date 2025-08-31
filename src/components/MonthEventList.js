@@ -7,7 +7,7 @@ const monthNames = [
 	'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const MonthEventList = ({ year, month, selectedDay, selectedEventIndex }) => {
+const MonthEventList = ({ year, month, selectedDay, selectedEventIndex, theme }) => {
 	const daysInMonth = new Date(year, month + 1, 0).getDate();
 	const eventBlocks = [];
 	let eventCounter = 0;
@@ -16,16 +16,23 @@ const MonthEventList = ({ year, month, selectedDay, selectedEventIndex }) => {
 		if (events.length > 0) {
 			if (eventBlocks.length > 0) {
 				eventBlocks.push(
-					React.createElement(Text, { key: 'sep-' + day }, '───────────────────────')
+					React.createElement(Text, { 
+						key: 'sep-' + day, 
+						color: theme.events.separator 
+					}, '───────────────────────')
 				);
 			}
 			eventBlocks.push(
 				React.createElement(Box, { key: 'day-' + day, flexDirection: 'column', marginBottom: 1 },
-					React.createElement(Text, { bold: true }, `${monthNames[month]} ${day}`),
+					React.createElement(Text, { 
+						bold: true, 
+						color: theme.events.dayHeader 
+					}, `${monthNames[month]} ${day}`),
 					...events.map((e, i) => {
 						const isSelected = selectedDay === day && selectedEventIndex === i;
 						return React.createElement(Text, {
 							key: 'event-' + i,
+							color: isSelected ? theme.events.selected : theme.events.event,
 							inverse: isSelected
 						}, `- ${e.text}`);
 					})
@@ -34,13 +41,16 @@ const MonthEventList = ({ year, month, selectedDay, selectedEventIndex }) => {
 		}
 	}
 	if (eventBlocks.length === 0) {
-		eventBlocks.push(React.createElement(Text, { dimColor: true, key: 'no-events' }, 'No events this month.'));
+		eventBlocks.push(React.createElement(Text, { 
+			color: theme.events.noEvents, 
+			key: 'no-events' 
+		}, 'No events this month.'));
 	}
 	return React.createElement(Box, { flexDirection: 'column', marginLeft: 2 }, ...eventBlocks,
 		(selectedDay && selectedEventIndex !== null && selectedEventIndex !== undefined) &&
-			React.createElement(Text, { color: 'yellow', dimColor: true }, 'Press e to edit selected event'),
+			React.createElement(Text, { color: theme.messages.info, dimColor: true }, 'Press e to edit selected event'),
 		(selectedDay && selectedEventIndex !== null && selectedEventIndex !== undefined) &&
-			React.createElement(Text, { color: 'red', dimColor: true }, 'Press d to delete selected event')
+			React.createElement(Text, { color: theme.messages.error, dimColor: true }, 'Press d to delete selected event')
 	);
 };
 
