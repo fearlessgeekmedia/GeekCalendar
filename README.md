@@ -54,7 +54,7 @@ geekcalendar
 ### Nix (flakes)
 - Run without installing:
 ```sh
-nix run github:fearlessgeekmedia/geekcalendar
+nix run github:fearlessgeekmedia/geekcalendar#geekcalendar
 ```
 
 - Install to your user profile:
