@@ -22,11 +22,21 @@
           nodejs = node;
           dontNpmBuild = true; # no build step, CLI app
           meta = with pkgs.lib; {
-            description = "TUI calendar application built with Ink";
+            description = "A beautiful TUI calendar application with intelligent terminal color support";
+            longDescription = ''
+              GeekCalendar is a terminal-based calendar application built with React and Ink.
+              Features include:
+              - Multiple color themes with intelligent contrast handling
+              - Event management with recurring events
+              - GitHub synchronization
+              - Import from Calcure and Calcurse
+              - Optimized for terminals with both light and dark backgrounds
+            '';
             homepage = "https://github.com/fearlessgeekmedia/geekcalendar";
             license = licenses.mit;
             mainProgram = "geekcalendar";
             platforms = platforms.all;
+            maintainers = [ ];
           };
         };
       in

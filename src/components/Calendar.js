@@ -65,6 +65,25 @@ const Calendar = ({ year, month, eventDays, theme }) => {
 		return undefined;
 	};
 	
+	// Get appropriate text color for background
+	const getTextColorForBackground = (backgroundColor, fallbackColor) => {
+		if (!backgroundColor) return fallbackColor;
+		
+		// Colors that work well with white text
+		const darkBackgrounds = ['blue', 'red', 'green', 'magenta', 'cyan'];
+		// Colors that work well with black text  
+		const lightBackgrounds = ['yellow', 'white'];
+		
+		if (darkBackgrounds.includes(backgroundColor)) {
+			return 'white';
+		} else if (lightBackgrounds.includes(backgroundColor)) {
+			return 'black';
+		} else {
+			// Default to white for unknown backgrounds
+			return 'white';
+		}
+	};
+	
 	return React.createElement(Box, { 
 		flexDirection: 'column', 
 		borderStyle: 'round', 
@@ -110,7 +129,7 @@ const Calendar = ({ year, month, eventDays, theme }) => {
 						backgroundColor: dayBackground
 					},
 						React.createElement(Text, { 
-							color: dayBackground ? 'black' : dayColor,
+							color: getTextColorForBackground(dayBackground, dayColor),
 							bold: day === todayDate || (eventDays && day && eventDays.has(day)),
 							italic: isWeekend
 						}, day ? String(day).padStart(2, ' ') : '  ')
